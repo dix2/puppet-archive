@@ -19,6 +19,13 @@ Puppet::Type.newtype(:archive) do
 
     defaultto(:present)
 
+    # Does not seem to be executed but should be a nicer way to do the show_diff before catalog apply
+    def pre_run_check
+      if Puppet[:show_diff]
+        provider.show_diff
+      end
+    end
+
     # The following changes allows us to notify if the resource is being replaced
     def is_to_s(value) # rubocop:disable Style/PredicateName
       return "(#{resource[:checksum_type]})#{provider.archive_checksum}" if provider.archive_checksum
@@ -68,6 +75,18 @@ Puppet::Type.newtype(:archive) do
     newvalues(:true, :false)
     defaultto(:false)
   end
+
+  newparam(:show_diff) do
+    desc 'shows diff will show every file that has changed in the archive'
+    newvalues(:true, :false)
+    defaultto(:true)
+  end
+
+  # newparam(:noop) do
+  #   desc 'systematically overrides noop'
+  #   newvalues(:true, :false)
+  #   defaultto(:false)
+  # end
 
   newparam(:extract_path) do
     desc 'target folder path to extract archive.'

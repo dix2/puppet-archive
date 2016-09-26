@@ -1,6 +1,7 @@
 begin
   require 'puppet_x/bodeco/archive'
   require 'puppet_x/bodeco/util'
+  require 'puppet/util/resource_template'
 rescue LoadError
   require 'pathname' # WORK_AROUND #14073 and #7788
   archive = Puppet::Module.find('archive', Puppet[:environment].to_s)
@@ -11,8 +12,12 @@ end
 
 require 'securerandom'
 require 'tempfile'
+require 'puppet/util'
+require 'puppet/node/facts'
 
 Puppet::Type.type(:archive).provide(:ruby) do
+  include Puppet::Util::Diff
+
   optional_commands aws: 'aws'
   defaultfor feature: :microsoft_windows
   attr_reader :archive_checksum
@@ -101,15 +106,83 @@ Puppet::Type.type(:archive).provide(:ruby) do
   end
 
   def extract
+    Puppet.debug('WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW')
     return unless resource[:extract] == :true
     raise(ArgumentError, 'missing archive extract_path') unless resource[:extract_path]
-    PuppetX::Bodeco::Archive.new(archive_filepath).extract(
-      resource[:extract_path],
-      custom_command: resource[:extract_command],
-      options: resource[:extract_flags],
-      uid: resource[:user],
-      gid: resource[:group]
-    )
+
+    remove_tmp_folder = false
+
+    extract_path = resource[:extract_path]
+
+
+
+    if Puppet[:show_diff] and resource[:show_diff]
+      #  write_temporarily do |path|
+      #    send @resource[:loglevel], "\n" + diff(@resource[:path], path)
+      #  end
+      o = [('a'..'z'), ('A'..'Z')].map { |i| i.to_a }.flatten
+      tmp_folder = '/tmp/' + (0...50).map { o[rand(o.length)] }.join
+      remove_tmp_folder = true
+
+      FileUtils.mkdir_p(tmp_folder)
+      PuppetX::Bodeco::Archive.new(archive_filepath).extract(
+        tmp_folder,
+        :custom_command => resource[:extract_command],
+        :options => resource[:extract_flags],
+        :uid => resource[:user],
+        :gid => resource[:group]
+      )
+      Puppet.debug('Extracted archive to temporary location ' + tmp_folder)
+      #Puppet.debug(diff(tmp_folder + '/content/overlay.js', resource[:extract_path] + '/content/overlay.js'))
+
+      # Since we do call Facter after compilation, it will be generated again, hence
+      # need to limit calls
+      facts = Facter.to_hash
+
+      #Puppet.debug(diff_dirs(tmp_folder, resource[:extract_path]))
+      Dir.chdir(tmp_folder) do
+        # !!!!!! TO BE UPDATED TO HANDLE NEW FILES AND FOLDERS
+        Dir.glob("**/*").select {|file| !File.directory? file}.each { |file|
+          ##if (Dir.exists(extract_path + "/" + file))
+          if File.extname(file) == ".erb"
+            Puppet.debug("Found template " + file)
+
+            # Removes erb extension and untemplate
+            generated_file = File.join(File.dirname(File.absolute_path(file)), File.basename(file, ".erb"))
+            content = Puppet::Util::ResourceTemplate.new(file, facts).evaluate
+            File.open(generated_file, 'w') { |file| file.write(content) }
+
+            existing_generated_file = File.join(File.dirname(file), File.basename(file, "*.erb"))
+
+            # output diff of un-templated file
+            Puppet.debug(diff(generated_file, existing_generated_file))
+
+            # Cleanup after run so we don't copy erb files
+            File.delete(file)
+          else
+            Puppet.debug(diff(tmp_folder + "/" + file, extract_path + "/" + file))
+          end
+        }
+        end
+      end
+
+      if ! Puppet[:noop]
+        FileUtils.cp_r(tmp_folder + "/.", extract_path)
+        # Copy or extract files only if noop not globally specified
+        # PuppetX::Bodeco::Archive.new(archive_filepath).extract(
+        #   resource[:extract_path],
+        #   :custom_command => resource[:extract_command],
+        #   :options => resource[:extract_flags],
+        #   :uid => resource[:user],
+        #   :gid => resource[:group]
+        # )
+      end
+
+      # Cleanup after show_diff
+      if remove_tmp_folder && File.directory?(tmp_folder) then
+        FileUtils.rm_rf(tmp_folder)
+      end
+
   end
 
   def extracted?
