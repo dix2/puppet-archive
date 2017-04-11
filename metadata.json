@@ -94,14 +94,14 @@
     }
   ],
   "name": "puppet-archive",
-  "version": "1.1.3-rc0",
-  "source": "https://github.com/voxpupuli/puppet-archive",
-  "author": "Vox Pupuli",
+  "version": "1.1.4",
+  "source": "https://github.com/dix2/puppet-archive",
+  "author": "D. Treulier",
   "license": "Apache-2.0",
   "summary": "Compressed archive file download and extraction with native types/providers for Windows and Unix",
   "description": "The archive module provides native puppet resources for managing compressed file download and extraction with optional checksum verification and cleanup.",
-  "project_page": "https://github.com/voxpupuli/puppet-archive",
-  "issues_url": "https://github.com/voxpupuli/puppet-archive/issues",
+  "project_page": "https://github.com/dix2/puppet-archive",
+  "issues_url": "https://github.com/dix2/puppet-archive/issues",
   "dependencies": [
     {
       "name": "puppetlabs/stdlib",
