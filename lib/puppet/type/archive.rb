@@ -96,6 +96,26 @@ Puppet::Type.newtype(:archive) do
       end
     end
   end
+  
+  newparam(:repackaging) do
+    desc 'whether archive will be compressed again after download and extraction (true|false).'
+    newvalues(:true, :false)
+    defaultto(:false)
+  end
+  
+  newparam(:erb_variables_hash) do
+    desc 'hash contains erb variables definition map.'
+    validate do |value|
+      unless value.hash?
+        raise ArgumentError, "archive erb_variables_hash must be an hash: #{value}"
+      end
+    end
+    munge do |val|
+      resource[:erb_variables_hash] = val
+    end
+    defaultto(:{})
+  end
+  
   newparam(:target) do
     desc 'target folder path to extract archive. (this parameter is for camptocamp/archive compatibility)'
     validate do |value|
